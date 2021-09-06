@@ -1,0 +1,186 @@
+---
+title: "Chapter 02 Problems - Using rstudio"
+output: html_document
+---
+
+# Load Libraries
+Only need to run the following installs once. Therefore commented after the first run.
+```{r}
+#install.packages(c("readxl","ggplot2", "ggpubr", "tidyverse", "broom", "AICcmodavg"))
+```
+```{r}
+library(readxl)
+library(ggplot2)
+library(ggpubr)
+library(tidyverse)
+library(broom)
+library(AICcmodavg)
+```
+## Functions
+```{r}
+PlotBands <- function(DataFrame, LinearModel, ...){
+    #get predicted y values using regression equation
+    newx <- seq(min(DataFrame$x), max(DataFrame$x), length.out=100)
+
+    #calculate the confidence interval values
+    conf <- predict(LinearModel, newdata = data.frame(x=newx), interval = 'confidence', level=0.95)
+
+    #calculate the prediction interval values
+    pred <- predict(LinearModel, newdata = data.frame(x=newx), interval = 'predict', level=0.95)
+  
+    #create plot of x vs. y, but don't display individual points (type='n') 
+    ########### Add flexibility to this plot function..
+    plot(y ~ x, data = DataFrame, type='n', ylim=c(min(pred[,2]),max(pred[,3])),...)
+    #############
+
+    #add polygon: Confidence Interval Upper -> Prediction Interval Upper
+    polygon(c(rev(newx), newx), c(rev(conf[ ,3]), pred[ ,3]), col = 'pink', border = NA)
+
+    #add polygon: Predicted Values -> Confidence Interval Upper
+    polygon(c(rev(newx), newx), c(rev(conf[ ,3]), conf[ ,1]), col = 'gray85', border = NA)
+
+    #add polygon: Predicted Values -> Confidence Interval Lower
+    polygon(c(rev(newx), newx), c(rev(conf[ ,2]), pred[ ,2]), col = 'pink', border = NA)
+
+    #add polygon: Confidence Interval Lower -> Prediction Interval Lower
+    polygon(c(rev(newx), newx), c(rev(conf[ ,2]), conf[ ,1]), col = 'gray85', border = NA)
+
+    #add line: Regression
+    abline(LinearModel, lwd=1.5)
+
+    #add line: Confidence Interval Upper
+    lines(newx, conf[ ,3], lty = 'dashed', col = 'gray5', lwd=1.5)
+    #add line: Confidence Interval Lower
+    lines(newx, conf[ ,2], lty = 'dashed', col = 'gray5', lwd=1.5)
+
+    #add line: Prediction Interval Upper
+    lines(newx, pred[ ,3], lty = 'dashed', col = 'red4', lwd=1.5)
+    #add line: Prediction Interval Upper
+    lines(newx, pred[ ,2], lty = 'dashed', col = 'red4', lwd=1.5)
+}
+
+LMStandardAnalysis <- function(DataFrame, LinearModel, Probability, AddLine=TRUE, ...){
+  ReturnList = list()
+  ReturnList$Summary <- summary(LinearModel)
+  ReturnList$Anova <- anova(LinearModel)
+  ReturnList$MSres <- ReturnList$Anova['Residuals','Mean Sq']
+  ReturnList$RSqrd <- ReturnList$Summary$r.squared
+  ReturnList$t_0 <- ReturnList$Summary$coefficients['x','t value']
+  ReturnList$t_alpha <- qt(Probability, df=nrow(DataFrame))
+  ReturnList$t_RejectNull <- (abs(ReturnList$t_0) > ReturnList$t_alpha)
+  ReturnList$fstatistic <- unname(ReturnList$Summary$fstatistic[1])
+  ReturnList$pvalue <- ReturnList$Summary$coefficients['x','Pr(>|t|)']
+  ReturnList$Intercept <- ReturnList$Summary$coefficients['(Intercept)','Estimate']
+  ReturnList$Slope <- ReturnList$Summary$coefficients['x','Estimate']
+  
+  plot(DataFrame$x, DataFrame$y,...)
+  if(AddLine){
+    abline(LinearModel)
+  }
+  return(ReturnList)
+  
+}
+```
+# Problems
+## 2.16
+```{r}
+Pressure <- list()
+
+Pressure$DataTable <- read_excel('../linear_regression_5e_data_sets/Chapter 2/Problems/data-prob-2-16.xls')
+
+Pressure$df <- data.frame(
+    x=Pressure$DataTable$'Volume', 
+    y=Pressure$DataTable$'Pressure')
+
+head(Pressure$df)
+
+Pressure$lm <- lm(y ~ x, data=Pressure$df)
+```
+```{r}
+PressureLM <- LMStandardAnalysis(Pressure$df, Pressure$lm, Probability = .975, xlab="Volume", ylab="Pressure")
+```
+```{r}
+PressureLM
+```
+
+```{r}
+PlotBands(Pressure$df, Pressure$lm)
+```
+
+
+The result of the linear model analysis confirms that this is a perfect relationship. 
+* The RSquared term is ~1 and the Residual Mean Squared is extremely small. 
+* The confidence intervals are extremely small, essentially non existent.
+* We reject the Null hypothesis
+This set of data essentially describes a perfect relationship.
+
+## 2.17
+```{r}
+BarometricPressure <- list()
+
+BarometricPressure$DataTable <- read_excel('../linear_regression_5e_data_sets/Chapter 2/Problems/data-prob-2-17.xls')
+
+BarometricPressure$df <- data.frame(
+    y=BarometricPressure$DataTable$'Boiling Point (F)', 
+    x=BarometricPressure$DataTable$'Barometric Pressure (in Hg)')
+
+head(BarometricPressure$df)
+
+BarometricPressure$lm <- lm(y ~ x, data=BarometricPressure$df)
+```
+```{r}
+BarometricPressureLM <- LMStandardAnalysis(BarometricPressure$df, BarometricPressure$lm, Probability = .975, 
+                                           ylab="Boiling Point (F)", xlab="Barometric Pressure (in Hg)")
+```
+
+```{r}
+BarometricPressureLM
+```
+The linear model is a very good fit for the data. 
+
+
+## 2.18
+```{r}
+MediaImpressions <- list()
+
+MediaImpressions$DataTable <- read_excel('../linear_regression_5e_data_sets/Chapter 2/Problems/data-prob-2-18.xls')
+
+MediaImpressions$df <- data.frame(
+    y=MediaImpressions$DataTable$'Returned Impressions per week (millions)', 
+    x=MediaImpressions$DataTable$'Amount Spent (Millions)')
+
+head(MediaImpressions$df)
+MediaImpressions$lm <- lm(y ~ x, data=MediaImpressions$df)
+```
+```{r}
+MediaImpressionsLM <- LMStandardAnalysis(MediaImpressions$df, MediaImpressions$lm, Probability = .975, 
+                                           ylab="Returned Impressions per week (millions)", xlab="Amount Spent (millions)")
+```
+```{r}
+MediaImpressionsLM
+```
+
+### a
+There seems to be a relationship there. The more money spent, the more impressions.
+
+The relationship between money and impressions is the following:
+
+y = `r MediaImpressions$Slope` * x + `r MediaImpressions$Intercept`
+
+
+### b
+ With the F-statistics of `r MediaImpressionsLM$fstatistic` and a p value of `r MediaImpressionsLM$pvalue` it is statistically significant. However with an R-squared of just `r MediaImpressionsLM$RSqrd` there is a lot of unexplained variance.
+
+### c
+
+```{r}
+PlotBands(MediaImpressions$df, MediaImpressions$lm, 
+          ylab="Returned Impressions per week (millions)", xlab="Amount Spent (millions)",
+          main="Returned Impressions per week (millions) vs. Amount Spent (millions)",
+          
+          )
+legend("topleft",
+       legend=c("Confidence","Prediction")
+)
+```
+
