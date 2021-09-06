@@ -66,7 +66,10 @@ LMStandardAnalysis <- function(DataFrame, LinearModel, Probability, AddLine=TRUE
   ReturnList$MSres <- ReturnList$Anova['Residuals','Mean Sq']
   ReturnList$RSqrd <- ReturnList$Summary$r.squared
   ReturnList$t_0 <- ReturnList$Summary$coefficients['x','t value']
-  ReturnList$t_alpha <- qt(Probability, df=nrow(DataFrame))
+  # The qt function returns the values for an 1-tail / upper-tail distribution
+  #   Therefore the input probability needs to be adjusted
+  adjProbability <- (1 - (1 - Probability)/2)
+  ReturnList$t_alpha <- qt(adjProbability, df=nrow(DataFrame))
   ReturnList$t_RejectNull <- (abs(ReturnList$t_0) > ReturnList$t_alpha)
   ReturnList$fstatistic <- unname(ReturnList$Summary$fstatistic[1])
   ReturnList$pvalue <- ReturnList$Summary$coefficients['x','Pr(>|t|)']
@@ -97,7 +100,7 @@ head(Pressure$df)
 Pressure$lm <- lm(y ~ x, data=Pressure$df)
 ```
 ```{r}
-PressureLM <- LMStandardAnalysis(Pressure$df, Pressure$lm, Probability = .975, xlab="Volume", ylab="Pressure")
+PressureLM <- LMStandardAnalysis(Pressure$df, Pressure$lm, Probability = .95, xlab="Volume", ylab="Pressure")
 ```
 ```{r}
 PressureLM
@@ -129,7 +132,7 @@ head(BarometricPressure$df)
 BarometricPressure$lm <- lm(y ~ x, data=BarometricPressure$df)
 ```
 ```{r}
-BarometricPressureLM <- LMStandardAnalysis(BarometricPressure$df, BarometricPressure$lm, Probability = .975, 
+BarometricPressureLM <- LMStandardAnalysis(BarometricPressure$df, BarometricPressure$lm, Probability = .95, 
                                            ylab="Boiling Point (F)", xlab="Barometric Pressure (in Hg)")
 ```
 
@@ -153,7 +156,7 @@ head(MediaImpressions$df)
 MediaImpressions$lm <- lm(y ~ x, data=MediaImpressions$df)
 ```
 ```{r}
-MediaImpressionsLM <- LMStandardAnalysis(MediaImpressions$df, MediaImpressions$lm, Probability = .975, 
+MediaImpressionsLM <- LMStandardAnalysis(MediaImpressions$df, MediaImpressions$lm, Probability = .95, 
                                            ylab="Returned Impressions per week (millions)", xlab="Amount Spent (millions)")
 ```
 ```{r}
@@ -165,7 +168,7 @@ There seems to be a relationship there. The more money spent, the more impressio
 
 The relationship between money and impressions is the following:
 
-y = `r MediaImpressions$Slope` * x + `r MediaImpressions$Intercept`
+Media Impressions = `r MediaImpressionsLM$Slope` * (Amount Spent) + `r MediaImpressionsLM$Intercept`
 
 
 ### b
@@ -177,10 +180,148 @@ y = `r MediaImpressions$Slope` * x + `r MediaImpressions$Intercept`
 PlotBands(MediaImpressions$df, MediaImpressions$lm, 
           ylab="Returned Impressions per week (millions)", xlab="Amount Spent (millions)",
           main="Returned Impressions per week (millions) vs. Amount Spent (millions)",
-          
+          sub=paste("Media Impressions = ",round(MediaImpressionsLM$Intercept,4)," + ",round(MediaImpressionsLM$Slope,4)," * Amount Spent (in millions)",sep="")
           )
 legend("topleft",
-       legend=c("Confidence","Prediction")
+       legend=c("Regression","Prediction","Confidence"),
+       col=c("black","red4","gray5"),
+       lty=c("solid","dashed","dashed"),
+       lwd=1.5
 )
+
 ```
 
+### d
+```{r}
+MCI_CI <- predict(MediaImpressions$lm, data.frame(x = c(26.9)), interval="confidence", level=0.95)
+PointPrediction <- MCI_CI[1]
+```
+```{r}
+x_0 <- 26.9
+x_bar <- mean(MediaImpressions$df$x)
+n <- nrow(MediaImpressions$df)
+t_alpha <- qt(.975, df=(n-2))
+S_xx <- sum(MediaImpressions$df$x^2) - ((sum(MediaImpressions$df$x))^2)/n
+ConfIntervalOnMean_Above <- PointPrediction + t_alpha * (sqrt(MediaImpressionsLM$MSres * (1/n + ((x_0 - x_bar)^2)/S_xx)))
+ConfIntervalOnMean_Below <- PointPrediction - t_alpha * (sqrt(MediaImpressionsLM$MSres * (1/n + ((x_0 - x_bar)^2)/S_xx)))
+```
+
+The predicted value of retained impressions from MCI at Spending Level of `r x_0` is: `r round(PointPrediction,4)`
+
+The corresponding confidence interval is: ( `r round(MCI_CI[2],4)`,`r round(MCI_CI[3],4)`)
+
+
+```{r}
+MCI_PI <- predict(MediaImpressions$lm, data.frame(x = c(26.9)), interval="prediction", level=0.95)
+```
+
+```{r}
+x_0 <- 26.9
+x_bar <- mean(MediaImpressions$df$x)
+n <- nrow(MediaImpressions$df)
+t_alpha <- qt(.975, df=(n-2))
+S_xx <- sum(MediaImpressions$df$x^2) - ((sum(MediaImpressions$df$x))^2)/n
+PredictInterval_Above <- PointPrediction + t_alpha * (sqrt(MediaImpressionsLM$MSres * (1 + 1/n + ((x_0 - x_bar)^2)/S_xx)))
+PredictInterval_Below <- PointPrediction - t_alpha * (sqrt(MediaImpressionsLM$MSres * (1 + 1/n + ((x_0 - x_bar)^2)/S_xx)))
+```
+The Prediction Interval for the number of retained impressions from MCI at Spending Level of `r x_0` is: ( `r round(MCI_PI[2],4)`,`r round(MCI_PI[3], 4)`)
+## 2.19
+```{r}
+PatientSatAge <- list()
+
+PatientSatAge$DataTable <- read_excel('../linear_regression_5e_data_sets/Appendices/data-table-B17.xls')
+
+PatientSatAge$df <- data.frame(
+    y=PatientSatAge$DataTable$'Satisfaction', 
+    x=PatientSatAge$DataTable$'Age')
+
+head(PatientSatAge$df)
+PatientSatAge$lm <- lm(y ~ x, data=PatientSatAge$df)
+```
+```{r}
+PatientSatAgeLM <- LMStandardAnalysis(PatientSatAge$df, PatientSatAge$lm, Probability = .95, 
+                                           ylab="Satisfaction", xlab="Age (years")
+```
+```{r}
+PatientSatAgeLM
+```
+
+### a
+
+The equation for the model is : Satisfaction = `r PatientSatAgeLM$Intercept` + `r PatientSatAgeLM$Slope` * Age
+
+The model relating Satisfaction to Age provides a good fit with an R-squared value of `r round(PatientSatAgeLM$RSqrd,4)`. Additionally the p-value is very small at `r PatientSatAgeLM$pvalue` and the Residual Mean Squared term is `r round(PatientSatAgeLM$MSres, 4)` and F-statistic of `r round(PatientSatAgeLM$fstatistic,4)`
+
+### b
+The model relating Satisfaction to Age is a better fit than the original model in section 2.7 which had a Residual Mean Squared term of 270.02 and a F-statistic of 17.1114 vs. the values of `r round(PatientSatAgeLM$MSres, 4)` and F-statistic of `r round(PatientSatAgeLM$fstatistic,4)`
+
+# 2.20
+```{r}
+FuelBoilingPoint <- list()
+
+FuelBoilingPoint$DataTable <- read_excel('../linear_regression_5e_data_sets/Appendices/data-table-B18.xls')
+
+FuelBoilingPoint$df <- data.frame(
+    y=FuelBoilingPoint$DataTable$'y', 
+    x=FuelBoilingPoint$DataTable$'x_5')
+
+head(FuelBoilingPoint$df)
+FuelBoilingPoint$lm <- lm(y ~ x, data=FuelBoilingPoint$df)
+```
+```{r}
+FuelBoilingPointLM <- LMStandardAnalysis(FuelBoilingPoint$df, FuelBoilingPoint$lm, Probability = .95, 
+                                           ylab="Fuel Consumption", xlab="Fuel - Initial Boiling Point")
+```
+```{r}
+FuelBoilingPointLM
+```
+The equation for the model is : FuelConsumption = `r FuelBoilingPointLM$Intercept` + `r FuelBoilingPointLM$Slope` * Fuel - Initial Boiling Point
+
+The engineer is correct that there is a relationship between Fuel Initial Boiling Point to Fuel consumption. However with a value of R-squared value: `r round(PatientSatAgeLM$RSqrd,4)` the model has a significant amount of unexplained variation.
+
+# 2.21
+```{r}
+WineSulphur <- list()
+
+WineSulphur$DataTable <- read_excel('../linear_regression_5e_data_sets/Appendices/data-table-B19.xls')
+
+WineSulphur$df <- data.frame(
+    y=WineSulphur$DataTable$'y', 
+    x=WineSulphur$DataTable$'x_3')
+
+head(WineSulphur$df)
+WineSulphur$lm <- lm(y ~ x, data=WineSulphur$df)
+```
+```{r}
+WineSulphurLM <- LMStandardAnalysis(WineSulphur$df, WineSulphur$lm, Probability = .95, 
+                                           ylab="Quality", xlab="SO_2 Content")
+```
+```{r}
+WineSulphurLM
+```
+Yes. It appears that the sulfur content of wine has a negative impact on the quality. With a p-value of `r round(WineSulphur,4)` the model does have a statistically significant relationship. However the r-squared value of `r rount(WineSulphurLM$RSqrd,4)` this is significant amount of variation that is not explained in the model.
+
+# 2.22
+
+```{r}
+MethanolOxidation <- list()
+
+MethanolOxidation$DataTable <- read_excel('../linear_regression_5e_data_sets/Appendices/data-table-B20.xls')
+
+MethanolOxidation$df <- data.frame(
+    y=MethanolOxidation$DataTable$'y', 
+    x=MethanolOxidation$DataTable$'x_5')
+
+head(MethanolOxidation$df)
+MethanolOxidation$lm <- lm(y ~ x, data=MethanolOxidation$df)
+```
+
+```{r}
+MethanolOxidationLM <- LMStandardAnalysis(MethanolOxidation$df, MethanolOxidation$lm,
+                                          Probability = .95, xlab="Ratio of Inlet Oxygen to Inlet Methanol",
+                                          ylab="Conversion Process")
+```
+```{r}
+MethanolOxidationLM
+```
+The chemist's belief appears to be unfounded. The p-value of `r round(MethonalOxidationLM$pvalue,4)` is too large, the f-statistic is too small at `r round(MethonalOxidationLM$fstatistic,4)`. More precisely, the t_0 value of `r round(MethonalOxidationLM$t_0,4)` is smaller than the t_alpha value of `r round(MethonalOxidationLM$t_alpha,4)` and therefore we reject the null hypothesis. Lastly, the r-squared value of `r round(MethonalOxidationLM$RSqrd, 4)` shows that the model explains extremely little of the variation.
