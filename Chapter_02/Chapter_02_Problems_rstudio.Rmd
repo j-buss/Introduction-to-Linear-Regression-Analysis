@@ -325,3 +325,13 @@ MethanolOxidationLM <- LMStandardAnalysis(MethanolOxidation$df, MethanolOxidatio
 MethanolOxidationLM
 ```
 The chemist's belief appears to be unfounded. The p-value of `r round(MethonalOxidationLM$pvalue,4)` is too large, the f-statistic is too small at `r round(MethonalOxidationLM$fstatistic,4)`. More precisely, the t_0 value of `r round(MethonalOxidationLM$t_0,4)` is smaller than the t_alpha value of `r round(MethonalOxidationLM$t_alpha,4)` and therefore we reject the null hypothesis. Lastly, the r-squared value of `r round(MethonalOxidationLM$RSqrd, 4)` shows that the model explains extremely little of the variation.
+
+#2.23
+```{r}
+rnorm(n = 20, mean = 0, sd = 16)
+```
+```{r}
+data.frame(x=seq(from=1, to=10, by=0.5 ))
+```
+
+Extremely poorly worded problem. I am unclear if this is the ask, however I am going with this:
